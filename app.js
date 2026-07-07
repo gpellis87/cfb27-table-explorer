@@ -22,24 +22,29 @@
   var panels = { browse: document.getElementById("panel-browse"), search: document.getElementById("panel-search") };
   var initialized = { browse: false, search: false };
 
-  tabButtons.forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var name = btn.getAttribute("data-tab");
-      tabButtons.forEach(function (b) {
-        b.classList.toggle("active", b === btn);
-        b.setAttribute("aria-selected", b === btn ? "true" : "false");
-      });
-      Object.keys(panels).forEach(function (k) {
-        panels[k].hidden = k !== name;
-      });
-      if (name === "browse" && !initialized.browse) { initialized.browse = true; initBrowse(); }
-      if (name === "search" && !initialized.search) { initialized.search = true; initSearch(); }
+  function activateTab(name) {
+    tabButtons.forEach(function (b) {
+      var active = b.getAttribute("data-tab") === name;
+      b.classList.toggle("active", active);
+      b.setAttribute("aria-selected", active ? "true" : "false");
     });
+    Object.keys(panels).forEach(function (k) {
+      panels[k].hidden = k !== name;
+    });
+    if (name === "browse" && !initialized.browse) { initialized.browse = true; initBrowse(); }
+    if (name === "search" && !initialized.search) { initialized.search = true; initSearch(); }
+  }
+
+  tabButtons.forEach(function (btn) {
+    btn.addEventListener("click", function () { activateTab(btn.getAttribute("data-tab")); });
   });
 
   // Default tab (browse) loads immediately.
   initialized.browse = true;
   initBrowse();
+
+  // Bridge from a Search-tab record to its row in Browse, set once Browse finishes loading.
+  var browseAPI = null;
 
   // ===================== Browse (schema map) =====================
   function initBrowse() {
@@ -125,12 +130,16 @@
     });
 
     var openIdx = null, openDetailEl = null;
-    function toggleDetail(tr) {
+    // focusRowIdx: when set (arriving from a Search-tab record click), force this table's
+    // panel open (rather than toggle-closing an already-open one) and skip the immediate
+    // scroll here - renderTableRecords does the final scroll, to the specific record.
+    function toggleDetail(tr, focusRowIdx) {
       var idx = Number(tr.dataset.idx);
+      var forceOpen = focusRowIdx !== undefined && focusRowIdx !== null;
       if (openDetailEl) openDetailEl.remove();
       var prevOpen = document.querySelector("#browseBody tr.row.open");
       if (prevOpen) prevOpen.classList.remove("open");
-      if (openIdx === idx) { openIdx = null; openDetailEl = null; return; }
+      if (openIdx === idx && !forceOpen) { openIdx = null; openDetailEl = null; return; }
       openIdx = idx;
       tr.classList.add("open");
       var d = DATA[idx];
@@ -138,14 +147,14 @@
       detailTr.className = "detail-row";
       var td = document.createElement("td");
       td.colSpan = 5;
-      td.appendChild(buildDetailPanel(d));
+      td.appendChild(buildDetailPanel(d, focusRowIdx));
       detailTr.appendChild(td);
       tr.parentNode.insertBefore(detailTr, tr.nextSibling);
       openDetailEl = detailTr;
-      detailTr.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      if (!forceOpen) detailTr.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
 
-    function buildDetailPanel(d) {
+    function buildDetailPanel(d, focusRowIdx) {
       var wrap = document.createElement("div");
       wrap.className = "detail-panel";
       var head = document.createElement("div");
@@ -206,7 +215,7 @@
               '<div class="no-records-note">Full record browser not available for this table (engine/internal data, or no populated rows in the football-relevant dataset).</div>';
             return;
           }
-          renderTableRecords(recordsSection, t);
+          renderTableRecords(recordsSection, t, focusRowIdx);
         })
         .catch(function () {
           recordsSection.innerHTML = '<div class="no-records-note">Couldn’t load record data.</div>';
@@ -226,6 +235,21 @@
       tr.scrollIntoView({ block: "center", behavior: "smooth" });
       toggleDetail(tr);
     }
+
+    // Entry point for "jump here" clicks from the Search tab.
+    browseAPI = {
+      openTable: function (name, rowIdx) {
+        var idx = DATA.findIndex(function (d) { return d.name === name; });
+        if (idx === -1) return;
+        document.getElementById("browseSearch").value = "";
+        Object.keys(catCounts).forEach(function (c) { activeCats[c] = true; });
+        renderCatList();
+        applyFilter();
+        var tr = rows[idx];
+        tr.scrollIntoView({ block: "start", behavior: "smooth" });
+        toggleDetail(tr, rowIdx);
+      },
+    };
 
     var searchInput = document.getElementById("browseSearch");
     var resultCount = document.getElementById("browseResultCount");
@@ -475,7 +499,7 @@
     var cursor = 0;
     function renderChunk(count) {
       var end = Math.min(cursor + count, g.rowIdxs.length);
-      for (; cursor < end; cursor++) list.appendChild(renderRecord(table, g.rowIdxs[cursor], terms));
+      for (; cursor < end; cursor++) list.appendChild(renderRecord(table, g.rowIdxs[cursor], terms, { jumpable: true }));
     }
     renderChunk(INITIAL_PER_GROUP);
     if (g.rowIdxs.length > cursor) {
@@ -495,7 +519,7 @@
   // Per-table record browser embedded in a Browse detail panel: all rows for one table, with
   // a scoped local filter. Simple substring scan (not the global inverted index) - fast enough
   // since it's bounded to a single table's rows (worst case ~16k, still sub-frame per keystroke).
-  function renderTableRecords(container, table) {
+  function renderTableRecords(container, table, focusRowIdx) {
     var head = document.createElement("div");
     head.className = "records-head";
     var countLabel = table.rows.length.toLocaleString() + (table.chunkCount > 1 ? " · merged from " + table.chunkCount + " chunks" : "");
@@ -559,11 +583,29 @@
     });
 
     reset([]);
+
+    // Arrived here from a Search-tab record click: render far enough to include it (rows
+    // render in original table order with no filter active, so filteredIdxs[i] === i), then
+    // scroll to it and flash it so it's findable among however many rows are now on screen.
+    if (focusRowIdx !== undefined && focusRowIdx !== null) {
+      if (focusRowIdx >= cursor) {
+        renderChunk(focusRowIdx - cursor + 1);
+        updateMoreBtn();
+      }
+      var targetEl = list.children[focusRowIdx];
+      if (targetEl) {
+        targetEl.scrollIntoView({ block: "center", behavior: "smooth" });
+        targetEl.classList.add("rec-focus");
+        setTimeout(function () { targetEl.classList.remove("rec-focus"); }, 2600);
+      }
+    }
   }
 
   // Shows the fields that actually matched the query first, then fills remaining slots with
   // whatever else is non-null - otherwise a match buried in field #20 never appears on screen.
-  function renderRecord(table, rowIdx, terms) {
+  // opts.jumpable (Search-tab results only) makes the row clickable: switch to Browse, open
+  // that table's detail panel, and scroll straight to this same row there.
+  function renderRecord(table, rowIdx, terms, opts) {
     var row = table.rows[rowIdx];
     var matched = [];
     var rest = [];
@@ -577,6 +619,19 @@
     var order = matched.concat(rest).slice(0, 9);
     var rec = document.createElement("div");
     rec.className = "rec";
+    if (opts && opts.jumpable) {
+      rec.classList.add("rec-jumpable");
+      rec.title = "Open in Browse tables";
+      rec.tabIndex = 0;
+      rec.addEventListener("click", function () {
+        if (!browseAPI) return;
+        activateTab("browse");
+        browseAPI.openTable(table.name, rowIdx);
+      });
+      rec.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); rec.click(); }
+      });
+    }
     rec.innerHTML = order.map(function (i) {
       return '<span class="cell"><span class="k">' + escHtml(table.fields[i]) + '</span><span class="v">' + highlight(String(row[i]), terms) + "</span></span>";
     }).join("");
