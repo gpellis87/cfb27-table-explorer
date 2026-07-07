@@ -192,6 +192,26 @@
         var btn = e.target.closest(".ref-link");
         if (btn) jumpTo(btn.getAttribute("data-jump"));
       });
+
+      var recordsSection = document.createElement("div");
+      recordsSection.className = "table-records";
+      recordsSection.innerHTML = '<div class="no-records-note">Loading records…</div>';
+      wrap.appendChild(recordsSection);
+      ensureSDATA()
+        .then(function () {
+          var t = SDATA.tables.find(function (t) { return t.name === d.name; });
+          recordsSection.innerHTML = "";
+          if (!t) {
+            recordsSection.innerHTML =
+              '<div class="no-records-note">Full record browser not available for this table (engine/internal data, or no populated rows in the football-relevant dataset).</div>';
+            return;
+          }
+          renderTableRecords(recordsSection, t);
+        })
+        .catch(function () {
+          recordsSection.innerHTML = '<div class="no-records-note">Couldn’t load record data.</div>';
+        });
+
       return wrap;
     }
 
@@ -270,13 +290,26 @@
   var PAGE_SIZE = 25;
   var MAX_GROUPS_SHOWN = 30;
 
+  var sdataPromise = null;
+  // Memoized loader: the per-table "all records" view in Browse and the global Search tab
+  // both need the same dataset, and whichever triggers first fetches it for both.
+  function ensureSDATA() {
+    if (!sdataPromise) {
+      sdataPromise = fetch("data/data.json")
+        .then(function (r) { return r.json(); })
+        .then(function (json) {
+          SDATA = json;
+          assignHues(SDATA.tables.map(function (t) { return t.category; }));
+          buildIndex();
+          return SDATA;
+        });
+    }
+    return sdataPromise;
+  }
+
   function initSearch() {
-    fetch("data/data.json")
-      .then(function (r) { return r.json(); })
-      .then(function (json) {
-        SDATA = json;
-        assignHues(SDATA.tables.map(function (t) { return t.category; }));
-        buildIndex();
+    ensureSDATA()
+      .then(function () {
         renderTryChips();
         wireSearch();
       })
@@ -452,6 +485,74 @@
       wrap.appendChild(moreBtn);
     }
     return wrap;
+  }
+
+  // Per-table record browser embedded in a Browse detail panel: all rows for one table, with
+  // a scoped local filter. Simple substring scan (not the global inverted index) - fast enough
+  // since it's bounded to a single table's rows (worst case ~16k, still sub-frame per keystroke).
+  function renderTableRecords(container, table) {
+    var head = document.createElement("div");
+    head.className = "records-head";
+    head.innerHTML =
+      '<span class="records-title">All records <span class="records-count">(' + table.rows.length.toLocaleString() + ')</span></span>' +
+      '<input type="search" class="scoped-search" placeholder="Filter within ' + escAttr(table.name) + '…" autocomplete="off" />';
+    container.appendChild(head);
+
+    var list = document.createElement("div");
+    list.className = "row-list";
+    container.appendChild(list);
+
+    var moreHolder = document.createElement("div");
+    container.appendChild(moreHolder);
+
+    var filteredIdxs = [];
+    var cursor = 0;
+    var currentTerms = [];
+
+    function renderChunk(count) {
+      var end = Math.min(cursor + count, filteredIdxs.length);
+      for (; cursor < end; cursor++) list.appendChild(renderRecord(table, filteredIdxs[cursor], currentTerms));
+    }
+
+    function updateMoreBtn() {
+      moreHolder.innerHTML = "";
+      if (filteredIdxs.length > cursor) {
+        var btn = document.createElement("button");
+        btn.className = "show-more";
+        btn.textContent = "Show " + Math.min(PAGE_SIZE, filteredIdxs.length - cursor) + " more of " + filteredIdxs.length;
+        btn.addEventListener("click", function () {
+          renderChunk(PAGE_SIZE);
+          updateMoreBtn();
+        });
+        moreHolder.appendChild(btn);
+      }
+    }
+
+    function reset(terms) {
+      currentTerms = terms;
+      filteredIdxs = table.rows
+        .map(function (_, i) { return i; })
+        .filter(function (i) {
+          if (terms.length === 0) return true;
+          var row = table.rows[i];
+          return terms.every(function (t) {
+            return row.some(function (v) { return v !== null && v !== undefined && String(v).toLowerCase().indexOf(t) !== -1; });
+          });
+        });
+      list.innerHTML = "";
+      cursor = 0;
+      renderChunk(INITIAL_PER_GROUP);
+      updateMoreBtn();
+    }
+
+    var input = head.querySelector(".scoped-search");
+    var timer = null;
+    input.addEventListener("input", function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () { reset(tokenize(input.value.trim())); }, 100);
+    });
+
+    reset([]);
   }
 
   // Shows the fields that actually matched the query first, then fills remaining slots with
