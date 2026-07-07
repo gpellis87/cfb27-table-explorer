@@ -44,6 +44,7 @@
             <li>Its bundled CFB27 schema (currently 468/2) — a game patch can outrun it, so pin it explicitly rather than relying on auto-detect</li>
             <li>An actual CFB27 dynasty save file</li>
             <li>Patience for multi-chunk tables: same table name can mean several physical chunks with genuinely different rows in each, not backups — check them all, not just the biggest</li>
+            <li>Watch for int fields that look like references but aren't: <code>TeamIndex</code> has to be matched against each team's own <code>TeamIndex</code> field by value, not used as a position in the Team array — those two numbers can differ per team</li>
           </ul>
         </div>
       </div>

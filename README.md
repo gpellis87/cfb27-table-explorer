@@ -31,6 +31,19 @@ just the largest — verified by cross-checking every included table's row count
 per-chunk dump (zero mismatches). `table-map.json`'s schema view still shows one representative
 chunk's fields (schema is identical across chunks of the same name, only row data differs).
 
+**On `TeamIndex`:** `Player`/`Coach`/etc. don't reference their team through a normal reference
+field - `TeamIndex` is a plain int. It is **not** a position in the `Team` table's record array
+(that was an earlier, wrong assumption here, caught by a user spotting Kirby Smart and Mike Bobo
+both showing as "East Carolina" instead of Georgia). It has to be joined by *value* against each
+team's own `TeamIndex` field instead - Georgia sits at array position 40 but its own `TeamIndex`
+field is 29, and 29 is what its real coaches' `TeamIndex` actually points to. Verified independently
+after the fix by cross-checking all 143 real teams' head coaches against `Team.HeadCoach` (a
+genuine reference field, unrelated to `TeamIndex`) and 15 real players against `Team.Roster`: zero
+mismatches. One irreducible wrinkle: the 5 generic "FCS &lt;region&gt;" placeholder teams (not real
+coached programs) all share `TeamIndex = 255`, the same sentinel value used everywhere else to mean
+"unassigned" - there's no way to tell them apart from the value alone, so those specific ~5 coaches
+correctly show no team rather than a guessed, possibly-wrong one.
+
 ## Regenerating the data
 
 The extraction scripts live in the `cfb27-recruiting-lab` project (they need
