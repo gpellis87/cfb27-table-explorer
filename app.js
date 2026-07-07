@@ -310,6 +310,11 @@
   function initSearch() {
     ensureSDATA()
       .then(function () {
+        var totalRows = SDATA.tables.reduce(function (s, t) { return s + t.rows.length; }, 0);
+        var introState = document.getElementById("introState");
+        introState.innerHTML =
+          '<p>Type something above — a school, a hometown, a coach\'s name, a position — and every record that mentions it shows up here, across every table.</p>' +
+          '<p class="intro-scale">' + totalRows.toLocaleString() + " records indexed across " + SDATA.tables.length.toLocaleString() + " tables.</p>";
         renderTryChips();
         wireSearch();
       })
@@ -493,8 +498,9 @@
   function renderTableRecords(container, table) {
     var head = document.createElement("div");
     head.className = "records-head";
+    var countLabel = table.rows.length.toLocaleString() + (table.chunkCount > 1 ? " · merged from " + table.chunkCount + " chunks" : "");
     head.innerHTML =
-      '<span class="records-title">All records <span class="records-count">(' + table.rows.length.toLocaleString() + ')</span></span>' +
+      '<span class="records-title">All records <span class="records-count">(' + countLabel + ')</span></span>' +
       '<input type="search" class="scoped-search" placeholder="Filter within ' + escAttr(table.name) + '…" autocomplete="off" />';
     container.appendChild(head);
 

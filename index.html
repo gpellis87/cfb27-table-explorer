@@ -15,7 +15,8 @@
       <h1>Save Explorer</h1>
       <p class="dek">
         Every table's structure, and every populated football-relevant record, read straight
-        from a real CFB 27 dynasty save with <code>madden-franchise</code>.
+        from a real CFB 27 dynasty save with <code>madden-franchise</code> — browse table by
+        table, or search across all of them at once.
       </p>
       <div class="stat-strip" id="statStrip">
         <div class="stat"><div class="n">—</div><div class="l">loading…</div></div>
@@ -32,8 +33,9 @@
       <div class="panel-grid">
         <div class="info-panel">
           <h2>About this view</h2>
-          <p>Every table's schema: its stable numeric ID, field list, and one real example value per field.</p>
-          <p>Table names/IDs/fields are part of the game's schema, not any one save — identical no matter whose save you read.</p>
+          <p>Click a table for its schema — stable numeric ID, field list, one real example value per field — and, where available, every real record in that table, with its own search box.</p>
+          <p>Table names/IDs/fields come from the game's schema, not any one save, so they're identical no matter whose save you read. Only the records themselves are specific to this save.</p>
+          <p>A table split across multiple physical chunks in the save (common for stat/history tables — <code>PlayerStatRecord</code> spans 36) is merged: every populated chunk's rows are included below, not just the largest one.</p>
         </div>
         <div class="info-panel">
           <h2>Explore it yourself</h2>
@@ -41,6 +43,7 @@
             <li><code>madden-franchise</code> npm library — CFB27 officially supported as of v4.3.x</li>
             <li>Its bundled CFB27 schema (currently 468/2) — a game patch can outrun it, so pin it explicitly rather than relying on auto-detect</li>
             <li>An actual CFB27 dynasty save file</li>
+            <li>Patience for multi-chunk tables: same table name can mean several physical chunks with genuinely different rows in each, not backups — check them all, not just the biggest</li>
           </ul>
         </div>
       </div>
@@ -69,7 +72,7 @@
         <main>
           <div class="result-line">
             <span id="browseResultCount"></span>
-            <span>click a row for full field list</span>
+            <span>click a row for its fields and records</span>
           </div>
           <div class="table-shell">
             <table class="grid">
@@ -110,7 +113,7 @@
     </section>
 
     <footer>
-      <span>Every field is read directly from the save via <code>madden-franchise</code> — nothing here is inferred or hand-typed.</span>
+      <span>Every field is read directly from the save via <code>madden-franchise</code> — nothing here is inferred or hand-typed. Where a table spans multiple physical chunks, every populated chunk is included, not just the largest.</span>
       <span>Data snapshot: a save created fresh at dynasty setup, before a week was advanced — day-one state, not one save's mid-season progress.</span>
     </footer>
   </div>
