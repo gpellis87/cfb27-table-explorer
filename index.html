@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CFB 27 Save Explorer</title>
+<meta name="description" content="Browse and search every table and record in a CFB 27 dynasty save file." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏈</text></svg>" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="masthead">
+      <span class="eyebrow">CFB 27 dynasty save</span>
+      <h1>Save Explorer</h1>
+      <p class="dek">
+        Every table's structure, and every populated football-relevant record, read straight
+        from a real CFB 27 dynasty save with <code>madden-franchise</code>.
+      </p>
+      <div class="stat-strip" id="statStrip">
+        <div class="stat"><div class="n">—</div><div class="l">loading…</div></div>
+      </div>
+    </header>
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="browse" role="tab" aria-selected="true">Browse tables</button>
+      <button class="tab" data-tab="search" role="tab" aria-selected="false">Search records</button>
+    </div>
+
+    <!-- BROWSE PANEL -->
+    <section id="panel-browse" class="panel">
+      <div class="panel-grid">
+        <div class="info-panel">
+          <h2>About this view</h2>
+          <p>Every table's schema: its stable numeric ID, field list, and one real example value per field.</p>
+          <p>Table names/IDs/fields are part of the game's schema, not any one save — identical no matter whose save you read.</p>
+        </div>
+        <div class="info-panel">
+          <h2>Explore it yourself</h2>
+          <ul>
+            <li><code>madden-franchise</code> npm library — CFB27 officially supported as of v4.3.x</li>
+            <li>Its bundled CFB27 schema (currently 468/2) — a game patch can outrun it, so pin it explicitly rather than relying on auto-detect</li>
+            <li>An actual CFB27 dynasty save file</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="layout">
+        <aside class="rail">
+          <div>
+            <span class="field-label">Search</span>
+            <input type="search" id="browseSearch" placeholder="table or field name…" autocomplete="off" />
+          </div>
+          <div>
+            <span class="field-label">Sort by</span>
+            <select id="browseSortSelect">
+              <option value="id">Table ID</option>
+              <option value="name">Name (A–Z)</option>
+              <option value="pop">Populated records</option>
+              <option value="fields">Field count</option>
+            </select>
+          </div>
+          <div>
+            <span class="field-label">Category</span>
+            <div class="cat-list" id="catList"></div>
+            <button class="reset-btn" id="resetCats">Reset filters</button>
+          </div>
+        </aside>
+        <main>
+          <div class="result-line">
+            <span id="browseResultCount"></span>
+            <span>click a row for full field list</span>
+          </div>
+          <div class="table-shell">
+            <table class="grid">
+              <thead>
+                <tr>
+                  <th data-sort="id">ID <span class="arrow"></span></th>
+                  <th data-sort="name">Table <span class="arrow"></span></th>
+                  <th data-sort="cat">Category <span class="arrow"></span></th>
+                  <th data-sort="pop">Records <span class="arrow"></span></th>
+                  <th data-sort="fields">Fields <span class="arrow"></span></th>
+                </tr>
+              </thead>
+              <tbody id="browseBody"></tbody>
+            </table>
+            <div class="empty-state" id="browseEmpty" style="display:none;">No tables match that search/filter.</div>
+          </div>
+        </main>
+      </div>
+    </section>
+
+    <!-- SEARCH PANEL -->
+    <section id="panel-search" class="panel" hidden>
+      <div class="search-shell">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+            <line x1="16.2" y1="16.2" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <input type="search" id="search" placeholder="Search a team, city, player, coach…" autocomplete="off" />
+        </div>
+        <div class="try-row" id="tryRow"><span class="try-label">Try:</span></div>
+      </div>
+      <main id="results" class="results">
+        <div class="intro-state" id="introState">
+          <p>Type something above — a school, a hometown, a coach's name, a position — and every record that mentions it shows up here, across every table.</p>
+        </div>
+      </main>
+    </section>
+
+    <footer>
+      <span>Every field is read directly from the save via <code>madden-franchise</code> — nothing here is inferred or hand-typed.</span>
+      <span>Data snapshot: a save created fresh at dynasty setup, before a week was advanced — day-one state, not one save's mid-season progress.</span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
